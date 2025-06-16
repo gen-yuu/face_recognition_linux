@@ -1,0 +1,5 @@
+opencv-python
+numpy
+dlib
+face_recognition
+Flask
