@@ -1,2 +1,0 @@
-# face_recognition_linux
-Linux環境の顔認証システム（face_recognitionモジュール使用）
