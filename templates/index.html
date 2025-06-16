@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <title>顔認証システム</title>
+    <style>
+      /* (前回のCSSとほぼ同じ) */
+      .registration-panel,
+      .auth-panel {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+      }
+      .registration-panel {
+        display: none;
+      } /* 初期状態では非表示 */
+      .info-box {
+        flex-grow: 1;
+      }
+      .actions {
+        margin-top: auto;
+      }
+      .actions button {
+        width: 100%;
+        padding: 15px;
+        font-size: 1.2em;
+        margin-top: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="left-panel">
+        <img class="video-feed" src="{{ url_for('video_feed') }}" />
+      </div>
+      <div class="right-panel">
+        <!-- 認証モード用パネル -->
+        <div id="auth-panel" class="auth-panel">
+          <div class="info-box">
+            <h2>認証モード</h2>
+            <p>カメラの前に顔を合わせてください</p>
+          </div>
+          <div class="actions">
+            <button id="start-reg-btn">顔を登録する</button>
+          </div>
+        </div>
+
+        <!-- 登録モード用パネル -->
+        <div id="reg-panel" class="registration-panel">
+          <div class="info-box">
+            <h2>顔登録モード</h2>
+            <p>ガイド枠に顔を合わせて撮影してください。</p>
+            <input type="text" id="user-name-input" placeholder="名前を入力" />
+          </div>
+          <div class="actions">
+            <button id="submit-reg-btn" disabled>登録する</button>
+            <button id="recapture-btn" style="display: none">撮り直す</button>
+            <button id="cancel-reg-btn">認証に戻る</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        const ui = {
+          authPanel: document.getElementById("auth-panel"),
+          regPanel: document.getElementById("reg-panel"),
+          startRegBtn: document.getElementById("start-reg-btn"),
+          submitRegBtn: document.getElementById("submit-reg-btn"),
+          recaptureBtn: document.getElementById("recapture-btn"),
+          cancelRegBtn: document.getElementById("cancel-reg-btn"),
+          userNameInput: document.getElementById("user-name-input"),
+        };
+
+        let appStatus = { mode: "AUTHENTICATING", isFrameCaptured: false };
+        let statusInterval;
+
+        // --- UI更新ロジック ---
+        const updateUI = () => {
+          if (appStatus.mode.startsWith("REGISTRATION")) {
+            ui.authPanel.style.display = "none";
+            ui.regPanel.style.display = "flex";
+          } else {
+            ui.authPanel.style.display = "flex";
+            ui.regPanel.style.display = "none";
+          }
+
+          ui.recaptureBtn.style.display = appStatus.isFrameCaptured
+            ? "block"
+            : "none";
+          const isNameEntered = ui.userNameInput.value.trim() !== "";
+          ui.submitRegBtn.disabled = !(
+            appStatus.isFrameCaptured && isNameEntered
+          );
+        };
+
+        // --- ステータス ポーリング ---
+        const startPolling = () => {
+          statusInterval = setInterval(async () => {
+            try {
+              const response = await fetch("/status");
+              appStatus = await response.json();
+              updateUI();
+            } catch (e) {
+              console.error("Status poll failed:", e);
+            }
+          }, 500);
+        };
+        const stopPolling = () => clearInterval(statusInterval);
+
+        // --- API通信関数 ---
+        const postRequest = async (endpoint, body) => {
+          try {
+            const response = await fetch(endpoint, {
+              method: "POST",
+              body: body,
+            });
+            if (!response.ok) {
+              const err = await response.json();
+              throw new Error(err.message);
+            }
+            return await response.json();
+          } catch (error) {
+            alert(`エラー: ${error.message}`);
+            return null;
+          }
+        };
+
+        // --- イベントリスナー ---
+        ui.startRegBtn.addEventListener("click", () => {
+          const password = prompt("登録用のパスワードを入力してください:");
+          if (password) {
+            const formData = new FormData();
+            formData.append("password", password);
+            postRequest("/check_password", formData).then((data) => {
+              if (data) postRequest("/start_registration");
+            });
+          }
+        });
+
+        ui.submitRegBtn.addEventListener("click", () => {
+          const formData = new FormData();
+          formData.append("name", ui.userNameInput.value.trim());
+          postRequest("/submit_registration", formData).then((data) => {
+            if (data) {
+              alert(data.message);
+              ui.userNameInput.value = "";
+            }
+          });
+        });
+
+        ui.recaptureBtn.addEventListener("click", () =>
+          postRequest("/recapture")
+        );
+        ui.cancelRegBtn.addEventListener("click", () =>
+          postRequest("/cancel_registration")
+        );
+        ui.userNameInput.addEventListener("input", updateUI);
+
+        // 初期化
+        startPolling();
+      });
+    </script>
+  </body>
+</html>
