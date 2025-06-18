@@ -1,2 +1,6 @@
 .venv/
 *.pickle
+__pycache__
+.python-version
+.DS_Store
+*.log

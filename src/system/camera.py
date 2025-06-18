@@ -1,5 +1,3 @@
-# src/system/camera.py
-
 import os
 import random
 from typing import Optional
@@ -95,9 +93,7 @@ class SimulatedCamera:
             raise FileNotFoundError
 
         self.image_files = [
-            f
-            for f in os.listdir(image_dir)
-            if f.lower().endswith((".jpg", ".png", ".pgm"))
+            f for f in os.listdir(image_dir) if f.lower().endswith((".jpg", ".png", ".pgm"))
         ]
 
         if not self.image_files:
